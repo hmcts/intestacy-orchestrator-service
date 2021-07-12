@@ -9,11 +9,14 @@ import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.test.context.TestSecurityContextHolder;
 import org.springframework.test.util.ReflectionTestUtils;
 import uk.gov.hmcts.probate.client.IdamClientApi;
+import uk.gov.hmcts.probate.model.exception.InvalidTokenException;
 import uk.gov.hmcts.probate.model.idam.AuthenticateUserResponse;
 import uk.gov.hmcts.probate.model.idam.TokenExchangeResponse;
 import uk.gov.hmcts.reform.authorisation.generators.AuthTokenGenerator;
+import uk.gov.hmcts.reform.authorisation.validators.AuthTokenValidator;
 
 import static org.hamcrest.Matchers.equalTo;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -24,6 +27,7 @@ import static org.mockito.Mockito.when;
 @RunWith(MockitoJUnitRunner.class)
 public class SecurityUtilsTest {
 
+    public static final String CODE = "CODE_VAL";
     private static final String SERVICE_TOKEN = "XXXXXX12345";
     private static final String USER_TOKEN = "1312jdhdh";
     private static final String CASEWORKER_PASSWORD = "caseworkerPassword";
@@ -33,10 +37,11 @@ public class SecurityUtilsTest {
     private static final String AUTH_CLIENT_SECRET = "authClientSecret";
     private static final String AUTH_CLIENT_ID = "authClientId";
     private static final String REDIRECT = "http://redirect";
-    public static final String CODE = "CODE_VAL";
-
     @Mock
     private AuthTokenGenerator authTokenGenerator;
+
+    @Mock
+    private AuthTokenValidator authTokenValidator;
 
     @Mock
     private IdamClientApi idamClient;
@@ -88,7 +93,7 @@ public class SecurityUtilsTest {
 
         assertThat(securityUtils.getAuthorisation(), equalTo(USER_TOKEN));
     }
-    
+
     @Test
     public void shouldSecurityContextUserAsScheduler() {
         ReflectionTestUtils.setField(securityUtils, "authRedirectUrl", REDIRECT);
@@ -112,5 +117,46 @@ public class SecurityUtilsTest {
         securityUtils.setSecurityContextUserAsScheduler();
 
         assertThat(securityUtils.getAuthorisation(), equalTo(USER_TOKEN));
+    }
+
+    @Test
+    public void givenTokenIsNull_whenGetBearToken_thenReturnNull() {
+        testGetBearToken(null, null);
+    }
+
+    @Test
+    public void givenTokenIsBlank_whenGetBearToken_thenReturnBlank() {
+        testGetBearToken(" ", " ");
+    }
+
+    @Test
+    public void givenTokenDoesNotHaveBearer_whenGetBearToken_thenReturnWithBearer() {
+        testGetBearToken("TestToken", "Bearer TestToken");
+    }
+
+    @Test
+    public void givenTokenDoesHaveBearer_whenGetBearToken_thenReturnWithBearer() {
+        testGetBearToken("Bearer TestToken", "Bearer TestToken");
+    }
+
+    private void testGetBearToken(String input, String expected) {
+        assertEquals(securityUtils.getBearerToken(input), expected);
+    }
+
+    @Test
+    public void givenServiceNameIsAuthenticated() throws InvalidTokenException {
+        when(authTokenValidator.getServiceName("Bearer TestService")).thenReturn("TestService");
+        assertEquals("TestService", securityUtils.authenticate("TestService"));
+    }
+
+    @Test(expected = InvalidTokenException.class)
+    public void authenticateABlankToken() throws InvalidTokenException {
+        securityUtils.authenticate(" ");
+    }
+
+    @Test
+    public void givenServiceNameIsNullFromToken() throws InvalidTokenException {
+        when(authTokenValidator.getServiceName("Bearer TestService")).thenReturn(null);
+        assertEquals(Boolean.FALSE, securityUtils.checkIfServiceIsAllowed("TestService"));
     }
 }

@@ -10,6 +10,8 @@ import feign.jackson.JacksonEncoder;
 import lombok.extern.slf4j.Slf4j;
 import uk.gov.hmcts.reform.authorisation.ServiceAuthorisationApi;
 import uk.gov.hmcts.reform.authorisation.generators.ServiceAuthTokenGenerator;
+import uk.gov.hmcts.reform.authorisation.validators.AuthTokenValidator;
+import uk.gov.hmcts.reform.authorisation.validators.ServiceAuthTokenValidator;
 
 
 @Slf4j
@@ -26,5 +28,10 @@ public class ServiceAuthConfiguration {
                 .contract(new SpringMvcContract())
                 .target(ServiceAuthorisationApi.class, s2sUrl);
         return new ServiceAuthTokenGenerator(secret, microservice, serviceAuthorisationApi);
+    }
+
+    @Bean
+    public AuthTokenValidator tokenValidator(ServiceAuthorisationApi s2sApi) {
+        return new ServiceAuthTokenValidator(s2sApi);
     }
 }
